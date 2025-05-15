@@ -172,6 +172,3 @@ class HomeGlow(MDApp):
 
 HomeGlow().run()
 
-
-
-#andrew made oollaattt
