@@ -9,6 +9,7 @@ import time
 import winsound
 import cv2
 import imutils
+import serial
 
 # === Global Flags ===
 alarm_mode = False
@@ -17,6 +18,9 @@ alarm_counter = 0
 off_timer_triggered = False
 no_motion_timeout = 5
 last_motion_time = time.time()
+
+arduino = serial.Serial(port='COM5', baudrate=9600, timeout=1)
+time.sleep(2)
 
 def find_camera_index():
     for index in range(1, 10):
@@ -44,6 +48,7 @@ def offtimer():
     if time.time() - last_motion_time >= no_motion_timeout:
         print("⏲️ No motion detected for 5 seconds. Turning off...")
         off_timer_triggered = True
+        arduino.write(b'0')
 
 def beepBoop():
     global alarm
@@ -92,6 +97,7 @@ def start_camera_loop():
 
             if threshold.sum() > 4:
                 print("Motion detected")
+                arduino.write(b'1')
                 alarm_counter += 1
                 last_motion_time = time.time()
                 off_timer_triggered = False
