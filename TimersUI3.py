@@ -140,3 +140,4 @@ alarm_list_frame.pack(fill='both', expand=True, pady=10)
 Thread(target=alarm_checker, daemon=True).start()
 
 root.mainloop()
+# gawa ni cla
