@@ -4,8 +4,8 @@ from kivymd.uix.button import MDRectangleFlatButton
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.screen import MDScreen
 from kivy.uix.popup import Popup
-from kivy.uix.boxlayout import BoxLayout
 from kivy.utils import get_color_from_hex
+from kivy.clock import Clock
 
 import threading
 import time
@@ -13,8 +13,8 @@ import winsound
 import cv2
 import imutils
 import serial
-import matplotlib.pyplot as plt
-from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
+
+from kivy_garden.graph import Graph, LinePlot
 
 # === Global Flags and Tracking ===
 alarm_mode = False
@@ -25,7 +25,7 @@ no_motion_timeout = 5
 last_motion_time = time.time()
 light_on_time = 0.0
 light_start_time = None
-energy_log = []
+energy_log = []  # list of (elapsed_seconds, energy_Wh)
 WATTAGE = 5.0  # Light power in watts
 
 arduino = serial.Serial(port='COM5', baudrate=9600, timeout=1)
@@ -77,9 +77,12 @@ def energy_logger():
             current = light_on_time + (time.time() - light_start_time)
         else:
             current = light_on_time
-        energy = (current / 3600) * WATTAGE
-        timestamp = time.strftime("%H:%M:%S")
-        energy_log.append((timestamp, energy))
+        energy = (current / 3600) * WATTAGE  # Wh
+        elapsed_sec = int(current)
+        energy_log.append((elapsed_sec, energy))
+        # Limit log size to last 100 points to avoid memory bloat
+        if len(energy_log) > 100:
+            energy_log.pop(0)
         time.sleep(5)
 
 def start_camera_loop():
@@ -197,21 +200,36 @@ class HomeGlow(MDApp):
         if not energy_log:
             return
 
-        times = [x[0] for x in energy_log]
-        values = [x[1] for x in energy_log]
+        graph = Graph(
+            xlabel='Time (s)',
+            ylabel='Energy (Wh)',
+            x_ticks_minor=5,
+            x_ticks_major=10,
+            y_ticks_major=1,
+            y_grid_label=True,
+            x_grid_label=True,
+            padding=5,
+            x_grid=True,
+            y_grid=True,
+            xmin=0,
+            xmax=max([point[0] for point in energy_log]) if energy_log else 10,
+            ymin=0,
+            ymax=max([point[1] for point in energy_log]) * 1.2 if energy_log else 1,
+            size_hint=(1, 1)
+        )
 
-        plt.figure(figsize=(8, 4))
-        plt.plot(times, values, marker='o', color='blue')
-        plt.title("Energy Usage Over Time")
-        plt.xlabel("Time")
-        plt.ylabel("Energy (Wh)")
-        plt.xticks(rotation=45)
-        plt.tight_layout()
+        plot = LinePlot(line_width=2, color=[0, 0, 1, 1])
+        plot.points = energy_log
+        graph.add_plot(plot)
 
-        canvas = FigureCanvasKivyAgg(plt.gcf())
-        popup = Popup(title='Energy Analytics', content=canvas,
-                      size_hint=(0.9, 0.7))
+        popup_layout = MDBoxLayout(orientation='vertical')
+        popup_layout.add_widget(graph)
+
+        popup = Popup(
+            title="Energy Usage Analytics",
+            content=popup_layout,
+            size_hint=(0.9, 0.7)
+        )
         popup.open()
-        plt.clf()  # clear plot to avoid stacking
 
 HomeGlow().run()
